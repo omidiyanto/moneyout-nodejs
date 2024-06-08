@@ -10,4 +10,4 @@ RUN chown -R 1002710000:0 "/.npm"
 RUN chown -R 1002710000:0 "/home/node/.npm"
 RUN npm install
 EXPOSE 8080
-CMD [ "npm", "run", "serve" ]
+CMD [ "npm", "run", "dev", "--", "--host" ]
