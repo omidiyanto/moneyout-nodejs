@@ -12,4 +12,4 @@ RUN chown -R 1002710000:0 "/.npm"
 RUN chown -R 1002710000:0 "/home/node/.npm"
 RUN chown -R 1002710000:0 "/usr/src/app"
 EXPOSE 8080
-CMD [ "npm", "run", "dev" ]
+CMD [ "npm", "run", "dev", "--", "--host" ]
