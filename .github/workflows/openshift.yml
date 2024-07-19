@@ -21,7 +21,7 @@ env:
   IMAGE_REGISTRY_PASSWORD: ${{ github.token }}
 
   # 🖊️ EDIT to specify custom tags for the container image, or default tags will be generated below.
-  IMAGE_TAGS: ""
+  IMAGE_TAGS: "latest,${{ github.sha::12 }}"
 
 on:
   # https://docs.github.com/en/actions/reference/events-that-trigger-workflows
@@ -89,7 +89,7 @@ jobs:
     - name: Determine image tags
       if: env.IMAGE_TAGS == ''
       run: |
-        echo "IMAGE_TAGS=latest ${GITHUB_SHA::12}" | tee -a $GITHUB_ENV
+        echo "IMAGE_TAGS=latest,${GITHUB_SHA::12}" | tee -a $GITHUB_ENV
 
     # Using docker build instead of buildah-build
     - name: Set up Docker Buildx
