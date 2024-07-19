@@ -87,7 +87,7 @@ jobs:
         
     - name: Create Service to Expose defined port
       run: |
-         if oc get service ${{ env.APP_NAME }} >/dev/null 2>&1; then
+        if oc get service ${{ env.APP_NAME }} >/dev/null 2>&1; then
           echo "Service ${{ env.APP_NAME }} exists. Skipping..."
         else
           echo "Service ${{ env.APP_NAME }} does not exist."
