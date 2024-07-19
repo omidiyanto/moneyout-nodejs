@@ -76,9 +76,15 @@ jobs:
 
     - name: Remove old deployment and Create new one
       run: |
-        oc delete deployment ${{ env.APP_NAME }}
+        if oc get deployment ${{ env.APP_NAME }} >/dev/null 2>&1; then
+          echo "Deployment ${{ env.APP_NAME }} exists. Deleting..."
+          oc delete deployment ${{ env.APP_NAME }}
+        else
+          echo "Deployment ${{ env.APP_NAME }} does not exist. Skipping deletion."
+        fi
+        echo "Creating new deployment..."
         oc create deployment ${{ env.APP_NAME }} --image=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
-
+        
     - name: Create Service to Expose defined port
       run: oc expose deployment ${{ env.APP_NAME }} --port=${{ env.APP_PORT }}
 
