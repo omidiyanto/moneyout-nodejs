@@ -36,7 +36,11 @@ jobs:
         run: echo "${{ env.IMAGE_REGISTRY_PASSWORD }}" | docker login docker.io -u ${{ env.IMAGE_REGISTRY_USER }} --password-stdin
 
       - name: Build Docker image
-        run: docker build -t ${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }} .
+        run: |
+          pwd 
+          ls -l
+          echo ""
+          docker build -t ${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }} .
 
   push:
     name: Push Docker Image
