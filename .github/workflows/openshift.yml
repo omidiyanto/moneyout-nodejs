@@ -3,113 +3,121 @@ name: OpenShift
 env:
   OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
   OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
-  # 🖊️ EDIT to set the kube context's namespace after login. Leave blank to use your user's default namespace.
   OPENSHIFT_NAMESPACE: ""
-
-  # 🖊️ EDIT to set a name for your OpenShift app, or a default one will be generated below.
   APP_NAME: "moneyout"
-
-  # 🖊️ EDIT with the port your application should be accessible on.
-  # If the container image exposes *exactly one* port, this can be left blank.
-  # Refer to the 'port' input of https://github.com/redhat-actions/oc-new-app
   APP_PORT: "8080"
-
-  # 🖊️ EDIT to change the image registry settings.
-  # Registries such as GHCR, Quay.io, and Docker Hub are supported.
   IMAGE_REGISTRY: docker.io/omidiyanto
   IMAGE_REGISTRY_USER: omidiyanto
   IMAGE_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-  # 🖊️ EDIT to specify custom tags for the container image, or default tags will be generated below.
   IMAGE_TAGS: "latest"
 
 on:
-  # https://docs.github.com/en/actions/reference/events-that-trigger-workflows
   workflow_dispatch:
   push:
-    # Edit to the branch(es) you want to build and deploy on each push.
     branches: [ "master" ]
 
 jobs:
-  openshift-ci-cd:
-    name: Build and deploy to OpenShift
+  checkout:
+    name: Checkout Repository
     runs-on: ubuntu-latest
-    environment: production
-    outputs:
-      ROUTE: ${{ steps.deploy-and-expose.outputs.route }}
-      SELECTOR: ${{ steps.deploy-and-expose.outputs.selector }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-    steps:        
-    - name: Check out repository
-      uses: actions/checkout@v4
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: checkout
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      - name: Log in to Dockerhub Registry
+        run: echo "${{ env.IMAGE_REGISTRY_PASSWORD }}" | docker login docker.io -u ${{ env.IMAGE_REGISTRY_USER }} --password-stdin
 
-    - name: Log in to Dockerhub Registry
-      run: echo "${{ env.IMAGE_REGISTRY_PASSWORD }}" | docker login docker.io -u ${{ env.IMAGE_REGISTRY_USER }} --password-stdin
+      - name: Build Docker image
+        run: docker build -t ${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }} .
 
-    - name: Build Docker image
-      run: docker build -t ${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }} .
+  push:
+    name: Push Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Push to Docker Hub
+        run: docker push ${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
 
-    - name: Push to Docker Hub
-      run: docker push ${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
-      
-    - name: Log in to OpenShift
-      uses: redhat-actions/oc-login@v1
-      with:
-        openshift_server_url: ${{ env.OPENSHIFT_SERVER }}
-        openshift_token: ${{ env.OPENSHIFT_TOKEN }}
-        insecure_skip_tls_verify: true
-        namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+  deploy:
+    name: Deploy to OpenShift
+    runs-on: ubuntu-latest
+    needs: push
+    steps:
+      - name: Log in to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ env.OPENSHIFT_SERVER }}
+          openshift_token: ${{ env.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
 
-    # This step should create a deployment, service, and route to run your app and expose it to the internet.
-    # https://github.com/redhat-actions/oc-new-app#readme
-    #- name: Create and expose app
-    #  id: deploy-and-expose
-    #  uses: redhat-actions/oc-new-app@v1
-    #  with:
-    #    app_name: ${{ env.APP_NAME }}
-    #   image: ${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
-    #    namespace: ${{ env.OPENSHIFT_NAMESPACE }}
-    #    port: ${{ env.APP_PORT }}
+      - name: Remove old deployment and Create new one
+        run: |
+          if oc get deployment ${{ env.APP_NAME }} >/dev/null 2>&1; then
+            echo "Deployment ${{ env.APP_NAME }} exists. Deleting..."
+            oc delete deployment ${{ env.APP_NAME }}
+          else
+            echo "Deployment ${{ env.APP_NAME }} does not exist. Skipping deletion."
+          fi
+          echo "Creating new deployment..."
+          oc create deployment ${{ env.APP_NAME }} --image=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
 
-    - name: Remove old deployment and Create new one
-      run: |
-        if oc get deployment ${{ env.APP_NAME }} >/dev/null 2>&1; then
-          echo "Deployment ${{ env.APP_NAME }} exists. Deleting..."
-          oc delete deployment ${{ env.APP_NAME }}
-        else
-          echo "Deployment ${{ env.APP_NAME }} does not exist. Skipping deletion."
-        fi
-        echo "Creating new deployment..."
-        oc create deployment ${{ env.APP_NAME }} --image=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
-        
-    - name: Create Service to Expose defined port
-      run: |
-        if oc get service ${{ env.APP_NAME }} >/dev/null 2>&1; then
-          echo "Service ${{ env.APP_NAME }} exists. Skipping..."
-        else
-          echo "Service ${{ env.APP_NAME }} does not exist."
-          echo "Creating new Service..."
-          oc expose deployment ${{ env.APP_NAME }} --port=${{ env.APP_PORT }}
-        fi
-        
+  service:
+    name: Expose Service
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Log in to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ env.OPENSHIFT_SERVER }}
+          openshift_token: ${{ env.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
 
-    - name: Create Route for Public Access
-      run: |
-        if oc get route ${{ env.APP_NAME }} >/dev/null 2>&1; then
-          echo "Route ${{ env.APP_NAME }} exists. Skipping..."
-        else
-          echo "Route ${{ env.APP_NAME }} does not exist."
-          echo "Creating new Route..."
-          oc create route edge --service=${{ env.APP_NAME }} --insecure-policy=Redirect
-        fi
-    
-    - name: Print application URL
-      run: |
-        echo
-        echo "======================== Your application is available at: ========================"
-        echo $(oc get route ${{ env.APP_NAME }} -o jsonpath='{.spec.host}')
-        echo "==================================================================================="
-        echo
+      - name: Create Service to Expose defined port
+        run: |
+          if oc get service ${{ env.APP_NAME }} >/dev/null 2>&1; then
+            echo "Service ${{ env.APP_NAME }} exists. Skipping..."
+          else
+            echo "Service ${{ env.APP_NAME }} does not exist."
+            echo "Creating new Service..."
+            oc expose deployment ${{ env.APP_NAME }} --port=${{ env.APP_PORT }}
+
+  route:
+    name: Create Route
+    runs-on: ubuntu-latest
+    needs: service
+    steps:
+      - name: Log in to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ env.OPENSHIFT_SERVER }}
+          openshift_token: ${{ env.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+
+      - name: Create Route for Public Access
+        run: |
+          if oc get route ${{ env.APP_NAME }} >/dev/null 2>&1; then
+            echo "Route ${{ env.APP_NAME }} exists. Skipping..."
+          else
+            echo "Route ${{ env.APP_NAME }} does not exist."
+            echo "Creating new Route..."
+            oc create route edge --service=${{ env.APP_NAME }} --insecure-policy=Redirect
+
+      - name: Print application URL
+        run: |
+          echo
+          echo "======================== Your application is available at: ========================"
+          echo $(oc get route ${{ env.APP_NAME }} -o jsonpath='{.spec.host}')
+          echo "==================================================================================="
+          echo
