@@ -42,6 +42,7 @@ jobs:
 
       - name: Build Docker image
         run: |
+          cd /home/runner/work/moneyout-nodejs/moneyout-nodejs
           pwd 
           ls -l
           echo ""
