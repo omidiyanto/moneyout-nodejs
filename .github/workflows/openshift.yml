@@ -23,6 +23,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        run: |
+          pwd
+          ls -la
 
   build:
     name: Build Docker Image
