@@ -82,6 +82,8 @@ jobs:
         fi
         echo "Creating new deployment..."
         oc create deployment ${{ env.APP_NAME }} --image=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
+        echo "Setting replicas to 0..."
+        oc scale deployment ${{ env.APP_NAME }} --replicas=0
         
     - name: Create Service to Expose defined port
       run: |
