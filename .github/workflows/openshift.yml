@@ -120,9 +120,10 @@ jobs:
 
     - name: Create Horizontal Pod Autoscaler
       run: |
+        oc scale deployment ${{ env.APP_NAME }} --replicas=0
         echo "Creating Horizontal Pod Autoscaler..."
         oc autoscale deployment ${{ env.APP_NAME }} --min=5 --max=10 --cpu-percent=80
-        oc scale deployment ${{ env.APP_NAME }} --replicas=5
+        oc scale deployment ${{ env.APP_NAME }} --replicas=10
     
     - name: Print application URL
       run: |
