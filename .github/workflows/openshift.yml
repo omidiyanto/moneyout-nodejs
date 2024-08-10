@@ -76,8 +76,8 @@ jobs:
       run: |
         if oc get deployment ${{ env.APP_NAME }} >/dev/null 2>&1; then
           echo "Deployment ${{ env.APP_NAME }} exists."
-          echo "Updating container image for deployment ${{ env.APP_NAME }}..."
-          oc set image deployment/${{ env.APP_NAME }} ${ env.APP_NAME }=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
+          echo "Updating container image for deployment ${{ env.APP_NAME }} ..."
+          oc set image deployment/${{ env.APP_NAME }} ${{ env.APP_NAME }}=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
           echo "Image update complete."
         else
           echo "Deployment ${{ env.APP_NAME }} does not exist"
