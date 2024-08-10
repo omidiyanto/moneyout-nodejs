@@ -109,10 +109,20 @@ jobs:
           oc create route edge --service=${{ env.APP_NAME }} --insecure-policy=Redirect
         fi
         
+    - name: Delete existing Horizontal Pod Autoscaler if it exists
+      run: |
+        if oc get hpa ${{ env.APP_NAME }} >/dev/null 2>&1; then
+          echo "Horizontal Pod Autoscaler ${{ env.APP_NAME }} exists. Deleting..."
+          oc delete hpa ${{ env.APP_NAME }}
+        else
+          echo "Horizontal Pod Autoscaler ${{ env.APP_NAME }} does not exist."
+        fi
+
     - name: Create Horizontal Pod Autoscaler
       run: |
         echo "Creating Horizontal Pod Autoscaler..."
         oc autoscale deployment ${{ env.APP_NAME }} --min=1 --max=10 --cpu-percent=80
+        oc scale deployment ${{ env.APP_NAME }} --replicas=1
     
     - name: Print application URL
       run: |
