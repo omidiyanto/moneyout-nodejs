@@ -71,19 +71,22 @@ jobs:
     #   image: ${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
     #    namespace: ${{ env.OPENSHIFT_NAMESPACE }}
     #    port: ${{ env.APP_PORT }}
-
-    - name: Remove old deployment and Create new one
+    
+    - name: Create New Deployment or Update Container Image for Existing Deployment
       run: |
         if oc get deployment ${{ env.APP_NAME }} >/dev/null 2>&1; then
-          echo "Deployment ${{ env.APP_NAME }} exists. Deleting..."
-          oc delete deployment ${{ env.APP_NAME }}
+          echo "Deployment ${{ env.APP_NAME }} exists."
+          echo "Updating container image for deployment ${{ env.APP_NAME }}..."
+          oc set image deployment/${{ env.APP_NAME }} ${ env.APP_NAME }=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
+          echo "Image update complete."
         else
-          echo "Deployment ${{ env.APP_NAME }} does not exist. Skipping deletion."
+          echo "Deployment ${{ env.APP_NAME }} does not exist"
+          echo "Creating new deployment..."
+          oc create deployment ${{ env.APP_NAME }} --image=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
+          echo "Setting replicas to 1..."
+          oc scale deployment ${{ env.APP_NAME }} --replicas=1
         fi
-        echo "Creating new deployment..."
-        oc create deployment ${{ env.APP_NAME }} --image=${{ env.IMAGE_REGISTRY }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAGS }}
-        echo "Setting replicas to 1..."
-        oc scale deployment ${{ env.APP_NAME }} --replicas=1
+
         
     - name: Create Service to Expose defined port
       run: |
@@ -105,6 +108,11 @@ jobs:
           echo "Creating new Route..."
           oc create route edge --service=${{ env.APP_NAME }} --insecure-policy=Redirect
         fi
+        
+    - name: Create Horizontal Pod Autoscaler
+      run: |
+        echo "Creating Horizontal Pod Autoscaler..."
+        oc autoscale deployment ${{ env.APP_NAME }} --min=1 --max=10 --cpu-percent=80
     
     - name: Print application URL
       run: |
